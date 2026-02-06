@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head meta name="google-site-verification" content="WBEthB3HARvVpcEFYV2fiHjwhTJyLkbOpSLWDlM9HiA" >
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HS Assistant | AI Agent</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(-45deg, #020617, #1e1b4b, #0f172a);
+            background-size: 400% 400%;
+            animation: gradient 15s ease infinite;
+        }
+
+        @keyframes gradient {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .chat-glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .user-msg {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            border-radius: 1.25rem 1.25rem 0 1.25rem;
+        }
+
+        .ai-msg {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.25rem 1.25rem 1.25rem 0;
+        }
+
+        /* Markdown Styling inside bubbles */
+        .prose { font-size: 0.875rem; color: white; }
+        .prose p { margin-bottom: 0.5rem; }
+        .prose ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.5rem; }
+        .prose strong { color: #60a5fa; }
+        .prose code { background: rgba(0,0,0,0.3); padding: 0.2rem 0.4rem; border-radius: 4px; }
+
+        #chatContainer::-webkit-scrollbar { width: 4px; }
+        #chatContainer::-webkit-scrollbar-track { background: transparent; }
+        #chatContainer::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+
+        .typing-dots span {
+            animation: blink 1.4s infinite both;
+            height: 5px;
+            width: 5px;
+            background: white;
+            display: inline-block;
+            border-radius: 50%;
+            margin: 0 2px;
+        }
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes blink {
+            0% { opacity: .2; }
+            20% { opacity: 1; }
+            100% { opacity: .2; }
+        }
+    </style>
+</head>
+<body class="gradient-bg h-screen flex flex-col items-center justify-center font-sans text-white overflow-hidden">
+
+    <div class="w-full max-w-4xl h-[95vh] flex flex-col chat-glass rounded-3xl overflow-hidden shadow-2xl mx-4">
+        
+        <!-- Header -->
+        <div class="p-6 border-b border-white/10 flex items-center justify-between bg-white/5">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 8V4H8"></path>
+                        <rect width="16" height="12" x="4" y="8" rx="2"></rect>
+                        <path d="M2 14h2"></path>
+                        <path d="M20 14h2"></path>
+                        <path d="M15 13v2"></path>
+                        <path d="M9 13v2"></path>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight">HS Assistant</h1>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                        <span class="text-xs text-green-400 font-medium tracking-widest uppercase">AI Active</span>
+                    </div>
+                </div>
+            </div>
+            <div class="hidden md:block">
+                <span id="apiStatus" class="text-xs text-white/40 font-mono">MODEL: GEMINI-2.5-FLASH</span>
+            </div>
+        </div>
+
+        <!-- Chat Container -->
+        <div id="chatContainer" class="flex-1 overflow-y-auto p-6 space-y-6">
+            <div class="flex justify-start items-end gap-3">
+                <div class="w-8 h-8 rounded-full bg-blue-900/50 flex items-center justify-center border border-blue-500/30 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="12" x="4" y="8" rx="2"></rect></svg>
+                </div>
+                <div class="ai-msg p-4 max-w-[85%] prose">
+                    <p>System initialized. I am <strong>HS Assistant</strong>. I'm connected via the 2.5 Flash model and ready to help. What's on your mind?</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="p-6 bg-white/5 border-t border-white/10">
+            <div class="relative flex items-center gap-3">
+                <input 
+                    type="text" 
+                    id="userInput" 
+                    onkeypress="if(event.key === 'Enter') sendMessage()" 
+                    placeholder="Message HS Assistant..." 
+                    class="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 focus:outline-none focus:border-blue-500/50 focus:bg-white/10 transition-all text-sm"
+                    autocomplete="off"
+                >
+                <button 
+                    id="sendBtn"
+                    onclick="sendMessage()" 
+                    class="bg-blue-600 hover:bg-blue-500 p-4 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Configuration
+        const apiKey = "AIzaSyAcMCPov2MNVkmpcS0xPqCTTF6zC9F-jqA";
+        const MODEL_ID = "gemini-2.5-flash-preview-09-2025";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_ID}:generateContent?key=${apiKey}`;
+
+        async function sendMessage() {
+            const input = document.getElementById('userInput');
+            const btn = document.getElementById('sendBtn');
+            const container = document.getElementById('chatContainer');
+            const message = input.value.trim();
+
+            if (!message || btn.disabled) return;
+
+            // UI Updates
+            appendMessage('user', message);
+            input.value = '';
+            btn.disabled = true;
+
+            // Loading placeholder
+            const loadingId = 'ai-' + Date.now();
+            appendLoading(loadingId);
+
+            try {
+                const response = await fetchWithRetry(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{ text: message }]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message);
+                }
+
+                const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response.";
+                
+                // Remove loading and show response
+                const loadingEl = document.getElementById(loadingId).closest('.flex');
+                if (loadingEl) loadingEl.remove();
+                appendMessage('ai', aiText);
+
+            } catch (error) {
+                console.error("API Error:", error);
+                const loadingEl = document.getElementById(loadingId).closest('.flex');
+                if (loadingEl) loadingEl.remove();
+                appendMessage('ai', "⚠️ Error: " + error.message);
+            } finally {
+                btn.disabled = false;
+                container.scrollTop = container.scrollHeight;
+                input.focus();
+            }
+        }
+
+        // Exponential backoff implementation
+        async function fetchWithRetry(url, options, retries = 5, delay = 1000) {
+            try {
+                const response = await fetch(url, options);
+                if (!response.ok && retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithRetry(url, options, retries - 1, delay * 2);
+                }
+                return response;
+            } catch (error) {
+                if (retries > 0) {
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return fetchWithRetry(url, options, retries - 1, delay * 2);
+                }
+                throw error;
+            }
+        }
+
+        function appendMessage(role, text) {
+            const container = document.getElementById('chatContainer');
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} items-end gap-3 fade-in`;
+            
+            let iconHtml = '';
+            if(role === 'ai') {
+                iconHtml = `
+                <div class="w-8 h-8 rounded-full bg-blue-900/50 flex items-center justify-center border border-blue-500/30 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="12" x="4" y="8" rx="2"></rect></svg>
+                </div>`;
+            }
+
+            const content = document.createElement('div');
+            content.className = `${role === 'user' ? 'user-msg' : 'ai-msg'} p-4 max-w-[85%] prose`;
+            
+            if (role === 'ai') {
+                content.innerHTML = marked.parse(text);
+            } else {
+                content.innerText = text;
+            }
+            
+            if(role === 'ai') wrapper.appendChild(document.createRange().createContextualFragment(iconHtml));
+            wrapper.appendChild(content);
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function appendLoading(id) {
+            const container = document.getElementById('chatContainer');
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex justify-start items-end gap-3`;
+            wrapper.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-blue-900/50 flex items-center justify-center border border-blue-500/30 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="16" height="12" x="4" y="8" rx="2"></rect></svg>
+                </div>
+                <div class="ai-msg p-4 prose">
+                    <div id="${id}" class="typing-dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(wrapper);
+            container.scrollTop = container.scrollHeight;
+        }
+    </script>
+</body>
+</html>
